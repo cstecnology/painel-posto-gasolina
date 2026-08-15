@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Notas Fiscais — Combustíveis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#EFF2ED;
+    --panel:#FFFFFF;
+    --panel-soft:#F7F8F5;
+    --ink:#182226;
+    --ink-soft:#5B6A68;
+    --line:#DBE1DA;
+    --line-strong:#C3CCC4;
+    --amber:#DB8A2C;
+    --amber-soft:#F6E4C8;
+    --teal:#2C6E6C;
+    --teal-soft:#D9E9E6;
+    --steel:#3F5D82;
+    --steel-soft:#DCE4EE;
+    --grey:#8A9490;
+    --grey-soft:#E7E9E4;
+    --red:#B5453D;
+    --red-soft:#F3DEDC;
+    --display:'Space Grotesk',sans-serif;
+    --body:'Inter',sans-serif;
+    --mono:'IBM Plex Mono',monospace;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);}
+  ::selection{background:var(--amber-soft);}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 24px 64px;}
+
+  header.top{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-bottom:22px;border-bottom:2px solid var(--ink);padding-bottom:16px;}
+  header.top .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);margin:0 0 6px;}
+  header.top h1{font-family:var(--display);font-weight:700;font-size:26px;margin:0;letter-spacing:-.01em;}
+  header.top .meta{font-family:var(--mono);font-size:12px;color:var(--ink-soft);text-align:right;line-height:1.6;}
+
+  .dropzone{border:2px dashed var(--line-strong);border-radius:var(--radius);background:var(--panel);padding:22px;display:flex;align-items:center;gap:18px;margin-bottom:22px;transition:border-color .15s,background .15s;}
+  .dropzone.drag{border-color:var(--amber);background:var(--amber-soft);}
+  .dropzone .dz-icon{width:42px;height:42px;flex:0 0 auto;border-radius:8px;background:var(--panel-soft);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--ink-soft);}
+  .dropzone .dz-text{flex:1;}
+  .dropzone .dz-text strong{font-family:var(--display);font-size:15px;}
+  .dropzone .dz-text p{margin:2px 0 0;font-size:13px;color:var(--ink-soft);}
+  .dropzone input[type=file]{display:none;}
+  .btn{font-family:var(--body);font-weight:600;font-size:13px;border:1px solid var(--ink);background:var(--ink);color:#fff;padding:9px 16px;border-radius:7px;cursor:pointer;transition:opacity .15s;}
+  .btn:hover{opacity:.85;}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line-strong);}
+  .btn.ghost:hover{border-color:var(--ink);opacity:1;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+
+  .progress-row{display:none;align-items:center;gap:12px;margin-top:14px;}
+  .progress-row.show{display:flex;}
+  .progress-track{flex:1;height:6px;background:var(--grey-soft);border-radius:4px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--amber);width:0%;transition:width .2s;}
+  .progress-label{font-family:var(--mono);font-size:11px;color:var(--ink-soft);white-space:nowrap;}
+
+  nav.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line-strong);margin-bottom:22px;}
+  nav.tabs button{font-family:var(--display);font-weight:600;font-size:13.5px;background:none;border:none;padding:10px 4px;margin-right:22px;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;position:relative;top:1px;}
+  nav.tabs button.active{color:var(--ink);border-bottom-color:var(--amber);}
+  nav.tabs button .count{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-left:4px;}
+
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  /* ---- Painel (dashboard) ---- */
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 16px 14px;}
+  .card .label{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);}
+  .card .value{font-family:var(--mono);font-size:24px;font-weight:600;margin-top:6px;font-variant-numeric:tabular-nums;}
+  .card .sub{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .card.amber{border-top:3px solid var(--amber);}
+  .card.teal{border-top:3px solid var(--teal);}
+  .card.steel{border-top:3px solid var(--steel);}
+  .card.ink{border-top:3px solid var(--ink);}
+
+  .gauge-block{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px 18px 16px;margin-bottom:20px;}
+  .gauge-block .gtitle{font-family:var(--display);font-weight:600;font-size:14px;margin-bottom:12px;}
+  .gauge-bar{display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--line-strong);}
+  .gauge-bar div{height:100%;}
+  .gauge-legend{display:flex;gap:18px;margin-top:10px;flex-wrap:wrap;}
+  .gauge-legend span{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);display:flex;align-items:center;gap:6px;}
+  .gauge-legend i{width:9px;height:9px;border-radius:2px;display:inline-block;}
+
+  .charts-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;}
+  .chart-box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;}
+  .chart-box h3{font-family:var(--display);font-size:13.5px;margin:0 0 10px;}
+  .chart-box canvas{max-height:260px;}
+
+  .alert{background:var(--red-soft);border:1px solid var(--red);color:#5e2a25;border-radius:var(--radius);padding:12px 14px;font-size:13px;margin-bottom:16px;display:none;}
+  .alert.show{display:block;}
+
+  /* ---- Tables (fornecedores / notas) ---- */
+  .table-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
+  .table-toolbar input[type=search],.table-toolbar select{font-family:var(--body);font-size:13px;padding:7px 10px;border:1px solid var(--line-strong);border-radius:6px;background:var(--panel);color:var(--ink);}
+  .table-toolbar .right{display:flex;gap:8px;align-items:center;}
+
+  table.data{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;font-size:13px;}
+  table.data thead th{text-align:left;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);background:var(--panel-soft);padding:9px 12px;border-bottom:1px solid var(--line-strong);white-space:nowrap;}
+  table.data tbody td{padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  table.data tbody tr:last-child td{border-bottom:none;}
+  table.data tbody tr:hover{background:var(--panel-soft);}
+  table.data .mono{font-family:var(--mono);font-size:12px;}
+  table.data input[type=text]{font-family:var(--body);font-size:13px;border:1px solid transparent;background:transparent;padding:4px 6px;border-radius:5px;width:100%;}
+  table.data input[type=text]:hover{border-color:var(--line-strong);}
+  table.data input[type=text]:focus{border-color:var(--amber);outline:none;background:var(--panel);}
+  table.data select.cat{font-family:var(--body);font-size:12.5px;padding:4px 6px;border-radius:5px;border:1px solid var(--line-strong);background:var(--panel);}
+
+  .tag{display:inline-block;font-family:var(--mono);font-size:10.5px;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:.04em;}
+  .tag.refinaria{background:var(--teal-soft);color:var(--teal);}
+  .tag.posto{background:var(--amber-soft);color:#8a5410;}
+  .tag.distribuidora{background:var(--steel-soft);color:var(--steel);}
+  .tag.outro{background:var(--grey-soft);color:var(--grey);}
+  .tag.erro{background:var(--red-soft);color:var(--red);}
+  .tag.ok{background:var(--teal-soft);color:var(--teal);}
+
+  .save-flag{font-family:var(--mono);font-size:11px;color:var(--teal);opacity:0;transition:opacity .3s;}
+  .save-flag.show{opacity:1;}
+
+  .empty-state{padding:60px 20px;text-align:center;color:var(--ink-soft);font-size:13.5px;}
+  .empty-state strong{display:block;font-family:var(--display);color:var(--ink);font-size:15px;margin-bottom:6px;}
+
+  details.raw{margin-top:2px;}
+  details.raw summary{font-family:var(--mono);font-size:11px;color:var(--ink-soft);cursor:pointer;}
+  details.raw pre{white-space:pre-wrap;font-family:var(--mono);font-size:10.5px;background:var(--panel-soft);padding:8px;border-radius:6px;max-height:160px;overflow:auto;margin:6px 0 0;}
+
+  .footnote{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:26px;line-height:1.6;}
+
+  @media (max-width:820px){
+    .cards{grid-template-columns:repeat(2,1fr);}
+    .charts-row{grid-template-columns:1fr;}
+    header.top{flex-direction:column;align-items:flex-start;}
+    header.top .meta{text-align:left;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <p class="eyebrow">Análise fiscal · Combustíveis</p>
+      <h1>Painel de Notas Fiscais</h1>
+    </div>
+    <div class="meta" id="headerMeta">0 notas carregadas</div>
+  </header>
+
+  <div class="dropzone" id="dropzone">
+    <div class="dz-icon">PDF</div>
+    <div class="dz-text">
+      <strong>Arraste os DANFEs (PDF) aqui</strong>
+      <p>ou clique para selecionar — pode escolher os arquivos de uma vez</p>
+    </div>
+    <input type="file" id="fileInput" multiple accept="application/pdf">
+    <button class="btn" id="btnSelect">Selecionar arquivos</button>
+  </div>
+  <div class="dropzone" id="dropzoneXlsx" style="padding:14px 22px;">
+    <div class="dz-icon">XLS</div>
+    <div class="dz-text">
+      <strong>Ou importe uma planilha já extraída (.xlsx)</strong>
+      <p>Colunas esperadas: Data Emissão, Número NF, Chave de Acesso, Emitente, CNPJ Emitente, Valor Total (R$)...</p>
+    </div>
+    <input type="file" id="xlsxInput" accept=".xlsx,.xls">
+    <button class="btn ghost" id="btnSelectXlsx">Selecionar planilha</button>
+  </div>
+  <div class="progress-row" id="progressRow">
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">0 / 0</div>
+  </div>
+  <div class="progress-row" id="rfbProgressRow">
+    <div class="progress-track"><div class="progress-fill" id="rfbProgressFill" style="background:var(--steel)"></div></div>
+    <div class="progress-label" id="rfbProgressLabel">Consultando Receita Federal... 0 / 0</div>
+  </div>
+
+  <div class="alert" id="errorAlert"></div>
+
+  <nav class="tabs">
+    <button data-tab="painel" class="active">Painel<span class="count" id="cPainel"></span></button>
+    <button data-tab="fornecedores">Fornecedores<span class="count" id="cForn">(0)</span></button>
+    <button data-tab="notas">Notas<span class="count" id="cNotas">(0)</span></button>
+  </nav>
+
+  <!-- PAINEL -->
+  <section class="tab-panel active" id="tab-painel">
+    <div id="painelEmpty" class="empty-state">
+      <strong>Nenhuma nota processada ainda</strong>
+      Carregue os PDFs ou a planilha acima para ver os totais por categoria.
+    </div>
+    <div id="painelContent" style="display:none;">
+      <div class="cards" id="summaryCards"></div>
+      <div class="gauge-block">
+        <div class="gtitle">Proporção do valor total por categoria</div>
+        <div class="gauge-bar" id="gaugeBar"></div>
+        <div class="gauge-legend" id="gaugeLegend"></div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-box"><h3>Valor total por categoria</h3><canvas id="chartCategoria"></canvas></div>
+        <div class="chart-box"><h3>Top 10 fornecedores por valor</h3><canvas id="chartTop10"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FORNECEDORES -->
+  <section class="tab-panel" id="tab-fornecedores">
+    <div class="table-toolbar">
+      <input type="search" id="searchForn" placeholder="Buscar por CNPJ ou nome...">
+      <div class="right">
+        <span class="save-flag" id="saveFlag">classificações salvas</span>
+        <button class="btn ghost" id="btnConsultarReceita">Consultar Receita Federal</button>
+        <button class="btn ghost" id="btnResetForn">Redefinir salvos</button>
+      </div>
+    </div>
+    <div id="fornEmpty" class="empty-state">
+      <strong>Nenhum fornecedor identificado ainda</strong>
+      Depois de processar os PDFs, os CNPJs únicos aparecem aqui para você classificar uma vez só.
+    </div>
+    <table class="data" id="tableForn" style="display:none;">
+      <thead><tr>
+        <th>CNPJ</th><th>Nome (Receita Federal — edite se preciso)</th><th>Atividade (CNAE)</th><th>Categoria</th><th>Notas</th><th>Valor total</th>
+      </tr></thead>
+      <tbody id="tbodyForn"></tbody>
+    </table>
+  </section>
+
+  <!-- NOTAS -->
+  <section class="tab-panel" id="tab-notas">
+    <div class="table-toolbar">
+      <input type="search" id="searchNotas" placeholder="Buscar por arquivo, CNPJ, número...">
+      <div class="right" style="flex-wrap:wrap;">
+        <select id="filterFornecedor"><option value="">Todos fornecedores</option></select>
+        <select id="filterComprador"><option value="">Todos compradores</option></select>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--ink-soft);">de</span>
+        <input type="date" id="filterDataDe">
+        <span style="font-family:var(--mono);font-size:11px;color:var(--ink-soft);">até</span>
+        <input type="date" id="filterDataAte">
+        <select id="filterCategoria">
+          <option value="">Todas categorias</option>
+          <option value="refinaria">Refinaria</option>
+          <option value="posto">Posto de combustível</option>
+          <option value="distribuidora">Distribuidora</option>
+          <option value="outro">Outro / não classificado</option>
+          <option value="erro">Erro de extração</option>
+        </select>
+        <button class="btn ghost" id="btnLimparFiltros">Limpar filtros</button>
+        <button class="btn" id="btnExportCsv">Exportar CSV</button>
+      </div>
+    </div>
+    <div id="notasEmpty" class="empty-state">
+      <strong>Nenhuma nota processada ainda</strong>
+      Carregue os PDFs no topo da página.
+    </div>
+    <table class="data" id="tableNotas" style="display:none;">
+      <thead><tr>
+        <th>Arquivo</th><th>Nº NF</th><th>CNPJ</th><th>Fornecedor</th><th>Comprador</th><th>Categoria</th><th>Data</th><th>Valor</th><th>Status</th>
+      </tr></thead>
+      <tbody id="tbodyNotas"></tbody>
+    </table>
+  </section>
+
+  <p class="footnote">
+    Os PDFs são processados 100% no seu navegador — o conteúdo das notas não sai do seu computador.
+    Apenas o número do CNPJ (dado público) de cada fornecedor é enviado à BrasilAPI para consultar o
+    nome empresarial e a atividade (CNAE) na Receita Federal. Nas planilhas, o destinatário também é
+    analisado para reconhecer postos de combustível pelo CNPJ e pelo nome. Nomes editados manualmente
+    e o cache de consultas ficam salvos no navegador para a próxima vez.
+  </p>
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ---------- estado ----------
+let notas = [];          // {id, arquivo, chave, cnpjRaw, cnpj, numero, data, valor, status, textoBruto, nomeSugerido}
+let fornecedores = {};   // cnpjRaw -> {nome, categoria, notasCount, valorTotal}
+let postos = {};         // CNPJ do destinatário -> {nome, notasCount, valorTotal}
+let charts = {};
+
+const KEYWORDS = {
+  refinaria: ["REFINARIA","PETROBRAS","PETROBAS","PETROLEO BRASILEIRO","PETRÓLEO BRASILEIRO","REFAP","REDUC","REPLAN","REGAP","REPAR","REVAP","RLAM","RNEST","ACELEN","MATARIPE","LUBNOR","GABRIEL PASSOS"],
+  distribuidora: ["DISTRIBUIDORA","IPIRANGA","RAIZEN","RAÍZEN","VIBRA ENERGIA","VIBRA S","ALE COMBUST","ROYAL FIC","SIM LUBRIFICANTES"],
+  posto: ["AUTO POSTO","POSTO DE COMBUST","POSTO ", "COMERCIO DE COMBUST","COM COMBUST","COMBUSTIVEIS LTDA","AUTO POSTO DE","POSTOS DE SERV"]
+};
+
+// Na planilha fornecida, o posto aparece principalmente como DESTINATÁRIO,
+// enquanto o emitente costuma ser uma distribuidora. Mantemos os dois papéis
+// separados e classificamos a nota como "posto" quando o destinatário é reconhecido.
+const POSTO_DESTINATARIO_KEYWORDS = [
+  "POSTO","AUTO POSTO","COMERCIO DE COMBUST","COMERCIO DE COMBUSTIVEL",
+  "COMERCIO DE COMBUSTIVEIS","COMERCIO DE PETROLEO","COMERCIO DE DERIVADOS",
+  "COM DE COMBUST","COMBUSTIVEL","COMBUSTIVEIS","DERIVADOS DE PETROLEO"
+];
+const DESTINATARIO_NAO_POSTO = [
+  "DISTRIBUIDORA","COMERCIALIZADORA","RAIZEN","PETROBRAS","VIBRA",
+  "YPETRO","NIMO ENERGIA","NIMOFAST","BCI COMERCIALIZADORA"
+];
+
+function normalizarTexto(s){
+  return String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+
+function sugerirPostoDestinatario(nome){
+  const n = normalizarTexto(nome);
+  if(!n || DESTINATARIO_NAO_POSTO.some(kw=>n.includes(kw))) return false;
+  return POSTO_DESTINATARIO_KEYWORDS.some(kw=>n.includes(kw));
+}
+
+function sugerirCategoria(nome){
+  const n = (nome||'').toUpperCase();
+  for (const kw of KEYWORDS.refinaria) if (n.includes(kw)) return 'refinaria';
+  for (const kw of KEYWORDS.distribuidora) if (n.includes(kw)) return 'distribuidora';
+  for (const kw of KEYWORDS.posto) if (n.includes(kw)) return 'posto';
+  return 'outro';
+}
+
+function sugerirCategoriaPorCnae(cnaeDescricao){
+  if(!cnaeDescricao) return null;
+  const c = cnaeDescricao.toUpperCase();
+  if(c.includes('REFINO DE PETR') || (c.includes('EXTRA') && c.includes('PETR'))) return 'refinaria';
+  if(c.includes('VAREJISTA') && c.includes('COMBUST')) return 'posto';
+  if(c.includes('ATACADISTA') && c.includes('COMBUST')) return 'distribuidora';
+  return null;
+}
+
+// ---------- consulta CNPJ na Receita Federal (BrasilAPI, dados públicos) ----------
+let cnpjCache = {}; // cnpjRaw -> {razaoSocial, cnae}
+async function loadCnpjCacheStorage(){
+  try{
+    const res = await window.storage.get('cnpj-cache-receita', false);
+    if(res && res.value) return JSON.parse(res.value);
+  }catch(e){ /* nada salvo ainda */ }
+  return {};
+}
+let cnpjCacheSaveTimer=null;
+function persistCnpjCache(){
+  clearTimeout(cnpjCacheSaveTimer);
+  cnpjCacheSaveTimer=setTimeout(async ()=>{
+    try{ await window.storage.set('cnpj-cache-receita', JSON.stringify(cnpjCache), false); }
+    catch(e){ console.error('Falha ao salvar cache de CNPJ', e); }
+  }, 800);
+}
+
+async function consultarReceita(cnpjRaw){
+  if(cnpjCache[cnpjRaw]) return cnpjCache[cnpjRaw];
+  try{
+    const resp = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjRaw}`);
+    if(!resp.ok) throw new Error('status '+resp.status);
+    const data = await resp.json();
+    const info = {
+      razaoSocial: data.razao_social || data.nome_fantasia || null,
+      cnae: data.cnae_fiscal_descricao || null
+    };
+    cnpjCache[cnpjRaw] = info;
+    persistCnpjCache();
+    return info;
+  }catch(e){
+    return null;
+  }
+}
+
+async function enriquecerFornecedoresReceita(){
+  const cnpjs = Object.keys(fornecedores);
+  for(const cnpj of cnpjs){
+    const f = fornecedores[cnpj];
+    if(f.fonteNome==='salvo' || f.fonteNome==='receita') continue;
+    f.fonteNome = 'consultando';
+    renderFornecedores();
+    const info = await consultarReceita(cnpj);
+    if(info && info.razaoSocial){
+      f.nome = info.razaoSocial;
+      f.fonteNome = 'receita';
+      f.cnaeDescricao = info.cnae || '';
+      if(!f.categoriaManual){
+        const catSugerida = sugerirCategoriaPorCnae(info.cnae) || sugerirCategoria(f.nome);
+        f.categoria = catSugerida;
+      }
+    } else {
+      f.fonteNome = 'pdf';
+    }
+    renderFornecedores();
+    renderPainel();
+    await new Promise(r=>setTimeout(r, 350)); // não sobrecarregar a API pública
+  }
+}
+
+// ---------- storage (classificações salvas) ----------
+async function loadFornStorage(){
+  try{
+    const res = await window.storage.get('fornecedores-classificacao', false);
+    if(res && res.value) return JSON.parse(res.value);
+  }catch(e){ /* nada salvo ainda */ }
+  return {};
+}
+let saveTimer=null;
+function persistForn(){
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(async ()=>{
+    try{
+      const toSave={};
+      for(const cnpj in fornecedores){
+        toSave[cnpj]={nome:fornecedores[cnpj].nome, categoria:fornecedores[cnpj].categoria};
+      }
+      await window.storage.set('fornecedores-classificacao', JSON.stringify(toSave), false);
+      const flag=document.getElementById('saveFlag');
+      flag.classList.add('show');
+      setTimeout(()=>flag.classList.remove('show'),1500);
+    }catch(e){ console.error('Falha ao salvar', e); }
+  },500);
+}
+
+// ---------- parsing do PDF ----------
+function decodeChave44(digits){
+  if(!digits || digits.length!==44 || !/^\d{44}$/.test(digits)) return null;
+  const cnpj = digits.slice(6,20);
+  const serie = digits.slice(22,25).replace(/^0+/,'')||'0';
+  const numero = digits.slice(25,34).replace(/^0+/,'')||'0';
+  const aamm = digits.slice(2,6);
+  return {
+    chave:digits,
+    cnpjRaw:cnpj,
+    cnpjFmt:cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5'),
+    serie, numero,
+    ano:'20'+aamm.slice(0,2), mes:aamm.slice(2,4)
+  };
+}
+
+function parseChave(text){
+  let m = text.match(/(\d{4}[\s.]{0,2}){10}\d{4}/);
+  let raw = m ? m[0] : null;
+  if(!raw){
+    const idx = text.toLowerCase().indexOf('chave de acesso');
+    if(idx>=0){
+      const window_ = text.slice(idx, idx+140).replace(/\D/g,'');
+      if(window_.length>=44) raw = window_.slice(0,44);
+    }
+  }
+  if(!raw) return null;
+  return decodeChave44(raw.replace(/\D/g,''));
+}
+
+function parseValorBR(str){
+  if(!str) return null;
+  const semMilhar = str.replace(/[^\d.,]/g,'').replace(/\./g,'').replace(',','.');
+  const v = parseFloat(semMilhar);
+  return isNaN(v)?null:v;
+}
+
+function extrairValorTotal(text){
+  // A ordem em que o texto de tabelas sai do PDF é imprevisível (rótulos e valores
+  // às vezes ficam em blocos separados), então em vez de pegar "o número mais perto
+  // do rótulo", pegamos o maior valor no formato de moeda BR (0.000,00) do documento.
+  // Validado manualmente contra notas reais de refinaria, distribuidora e posto.
+  const matches = [...text.matchAll(/\d{1,3}(?:\.\d{3})*,\d{2}(?!\d)/g)];
+  if(matches.length===0) return null;
+  const valores = matches.map(m=>parseValorBR(m[0])).filter(v=>v!==null);
+  if(valores.length===0) return null;
+  return Math.max(...valores);
+}
+
+const NOME_BLACKLIST = /INSCRI[ÇC][ÃA]O|PROTOCOLO|CONTROLE DO FISCO|DOCUMENTO AUXILIAR|NOTA FISCAL ELETR|CHAVE DE ACESSO|RECEBEMOS|IDENTIFICA[ÇC][ÃA]O|RAZ[ÃA]O SOCIAL|DESTINAT[ÁA]RIO|NATUREZA DA OPERA|DANFE/i;
+
+function extrairNomeSugerido(text, cnpjFmt){
+  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+  const idx = lines.findIndex(l=>l.includes(cnpjFmt));
+  if(idx<0) return '';
+  // Sobe pelas linhas anteriores à do CNPJ (cabeçalho/letterhead) procurando a
+  // primeira que pareça um nome de empresa: predominância de letras, 2+ palavras,
+  // sem sequência longa de dígitos (o que geralmente indica endereço/CEP/telefone).
+  for(let i=idx-1; i>=Math.max(0, idx-14); i--){
+    const l = lines[i];
+    if(NOME_BLACKLIST.test(l)) continue;
+    if(/\d{3,}/.test(l)) continue;
+    const letras = (l.match(/[A-Za-zÀ-ú]/g)||[]).length;
+    const palavras = l.split(/\s+/).filter(w=>w.length>1);
+    if(letras>=6 && palavras.length>=2) return l;
+  }
+  return '';
+}
+
+function extrairDestinatario(text, cnpjEmitenteFmt){
+  const cnpjRegex = /\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/g;
+  const emitenteDigits = cnpjEmitenteFmt.replace(/\D/g,'');
+  const matches = [...text.matchAll(cnpjRegex)].map(m=>m[0]);
+  const destCnpjFmt = matches.find(c => c.replace(/\D/g,'') !== emitenteDigits);
+  if(!destCnpjFmt) return null;
+  return {
+    cnpjRaw: destCnpjFmt.replace(/\D/g,''),
+    cnpjFmt: destCnpjFmt,
+    nome: extrairNomeSugerido(text, destCnpjFmt)
+  };
+}
+
+function parseDataBR(str){
+  if(!str) return null;
+  const m = String(str).match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if(!m) return null;
+  return `${m[3]}-${m[2]}-${m[1]}`; // AAAA-MM-DD, comparável com <input type="date">
+}
+
+async function extrairDataEmissao(text){
+  const dateRe = /(\d{2})[\/.](\d{2})[\/.](\d{4})/;
+  const idx = text.search(/data\s*da\s*emiss[ãa]o/i);
+  if(idx>=0){
+    const m = text.slice(idx, idx+60).match(dateRe);
+    if(m) return `${m[1]}/${m[2]}/${m[3]}`;
+  }
+  const m2 = text.match(dateRe);
+  return m2 ? `${m2[1]}/${m2[2]}/${m2[3]}` : '';
+}
+
+async function processarPDF(file){
+  const id = file.name + '_' + file.size;
+  try{
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+    let text = '';
+    for(let p=1; p<=pdf.numPages; p++){
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      let lastY = null;
+      for(const item of content.items){
+        const y = item.transform ? item.transform[5] : null;
+        if(lastY!==null && y!==null && Math.abs(y-lastY)>2){ text += '\n'; }
+        else if(lastY!==null){ text += ' '; }
+        text += item.str;
+        if(y!==null) lastY = y;
+      }
+      text += '\n';
+    }
+    const chaveInfo = parseChave(text);
+    const valor = extrairValorTotal(text);
+    const data = await extrairDataEmissao(text);
+
+    if(!chaveInfo){
+      return {id, arquivo:file.name, status:'erro', motivo:'Chave de acesso não encontrada', textoBruto:text.slice(0,2000)};
+    }
+    const nomeSugerido = extrairNomeSugerido(text, chaveInfo.cnpjFmt);
+    const destinatario = extrairDestinatario(text, chaveInfo.cnpjFmt);
+    return {
+      id, arquivo:file.name, status: valor!==null ? 'ok' : 'parcial',
+      chave:chaveInfo.chave, cnpjRaw:chaveInfo.cnpjRaw, cnpj:chaveInfo.cnpjFmt,
+      numero:chaveInfo.numero, serie:chaveInfo.serie, ano:chaveInfo.ano, mes:chaveInfo.mes,
+      data, dataISO: parseDataBR(data), valor, nomeSugerido,
+      compradorNome: destinatario ? destinatario.nome : '',
+      compradorCnpj: destinatario ? destinatario.cnpjFmt : '',
+      textoBruto:text.slice(0,2000)
+    };
+  }catch(e){
+    return {id, arquivo:file.name, status:'erro', motivo:'Falha ao ler PDF: '+e.message, textoBruto:''};
+  }
+}
+
+// ---------- registro compartilhado (usado pelo fluxo de PDF e pelo de planilha) ----------
+function registrarPosto(resultado){
+  const cnpj = String(resultado.compradorCnpj||'').replace(/\D/g,'');
+  const nome = String(resultado.compradorNome||'').trim();
+  if(!cnpj || cnpj.length!==14 || !sugerirPostoDestinatario(nome)) return false;
+  if(!postos[cnpj]){
+    postos[cnpj] = {nome: nome || cnpj, notasCount:0, valorTotal:0};
+  }else if(nome && postos[cnpj].nome===cnpj){
+    postos[cnpj].nome = nome;
+  }
+  postos[cnpj].notasCount++;
+  postos[cnpj].valorTotal += (resultado.valor||0);
+  return true;
+}
+
+function registrarNota(resultado, savedForn, fonteOrigem){
+  notas.push(resultado);
+  registrarPosto(resultado);
+  if(resultado.cnpjRaw){
+    if(!fornecedores[resultado.cnpjRaw]){
+      const saved = savedForn[resultado.cnpjRaw];
+      fornecedores[resultado.cnpjRaw] = {
+        nome: saved ? saved.nome : (resultado.nomeSugerido || '(nome não identificado)'),
+        categoria: saved ? saved.categoria : sugerirCategoria(resultado.nomeSugerido),
+        fonteNome: saved ? 'salvo' : fonteOrigem,
+        categoriaManual: !!saved,
+        cnaeDescricao: '',
+        notasCount:0, valorTotal:0
+      };
+    }
+    fornecedores[resultado.cnpjRaw].notasCount++;
+    fornecedores[resultado.cnpjRaw].valorTotal += (resultado.valor||0);
+  }
+}
+
+// ---------- pipeline principal (PDF) ----------
+async function processarArquivos(fileList){
+  const files = Array.from(fileList).filter(f=>f.type==='application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+  if(files.length===0) return;
+
+  document.getElementById('progressRow').classList.add('show');
+  const savedForn = await loadFornStorage();
+
+  for(let i=0;i<files.length;i++){
+    const resultado = await processarPDF(files[i]);
+    registrarNota(resultado, savedForn, 'pdf');
+
+    const pct = Math.round(((i+1)/files.length)*100);
+    document.getElementById('progressFill').style.width = pct+'%';
+    document.getElementById('progressLabel').textContent = `${i+1} / ${files.length}`;
+    if(i % 8 === 0) await new Promise(r=>setTimeout(r,0)); // não travar a UI
+  }
+
+  document.getElementById('progressRow').classList.remove('show');
+  renderAll();
+  enriquecerFornecedoresReceita(); // consulta nomes na Receita Federal em segundo plano
+}
+
+// ---------- pipeline principal (planilha já extraída) ----------
+function normalizarCabecalho(h){
+  return String(h||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
+}
+const MAPA_COLUNAS = {
+  dataemissao:'data', numeronf:'numero', serie:'serie', chavedeacesso:'chave',
+  emitente:'nome', cnpjemitente:'cnpj', destinatario:'destinatario', cnpjdestinatario:'cnpjDestinatario',
+  valortotalr:'valor', paginasnopdf:'paginas', qtdpaginasnopdf:'qtdPaginas'
+};
+
+function excelDataParaString(v){
+  if(!v) return '';
+  if(v instanceof Date) return `${String(v.getDate()).padStart(2,'0')}/${String(v.getMonth()+1).padStart(2,'0')}/${v.getFullYear()}`;
+  return String(v);
+}
+
+async function processarXLSX(file){
+  document.getElementById('progressRow').classList.add('show');
+  document.getElementById('progressLabel').textContent = 'Lendo planilha...';
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array', cellDates:true});
+  // usa a primeira aba que tiver colunas reconhecíveis (ignora abas tipo "Resumo")
+  let sheet = null;
+  for(const name of wb.SheetNames){
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, defval:null});
+    if(rows.length>1){
+      const cols = rows[0].map(normalizarCabecalho);
+      if(cols.some(c=>MAPA_COLUNAS[c])){ sheet = {name, rows}; break; }
+    }
+  }
+  if(!sheet){
+    document.getElementById('progressRow').classList.remove('show');
+    alert('Não encontrei colunas reconhecíveis na planilha. Confira se os cabeçalhos batem com o esperado.');
+    return;
+  }
+
+  const cabecalho = sheet.rows[0].map(normalizarCabecalho);
+  const idxMap = {};
+  cabecalho.forEach((c,i)=>{ if(MAPA_COLUNAS[c]) idxMap[MAPA_COLUNAS[c]] = i; });
+
+  const savedForn = await loadFornStorage();
+  const linhas = sheet.rows.slice(1).filter(r=>r && r.length);
+
+  for(let i=0;i<linhas.length;i++){
+    const r = linhas[i];
+    const chave = String(idxMap.chave!==undefined ? (r[idxMap.chave]||'') : '').replace(/\D/g,'');
+    const chaveInfo = chave.length===44 ? decodeChave44(chave) : null;
+    const cnpjPlanilha = String(idxMap.cnpj!==undefined ? (r[idxMap.cnpj]||'') : '').replace(/\D/g,'');
+    const cnpjRaw = chaveInfo ? chaveInfo.cnpjRaw : cnpjPlanilha;
+    const nome = idxMap.nome!==undefined ? String(r[idxMap.nome]||'').trim() : '';
+    const valorBruto = idxMap.valor!==undefined ? r[idxMap.valor] : null;
+    const valor = typeof valorBruto === 'number' ? valorBruto : parseValorBR(String(valorBruto||''));
+    let data = idxMap.data!==undefined ? excelDataParaString(r[idxMap.data]) : '';
+    if(!data && chaveInfo) data = `(mês/ano da chave) ${chaveInfo.mes}/${chaveInfo.ano}`;
+    const numero = idxMap.numero!==undefined ? String(r[idxMap.numero]||(chaveInfo?chaveInfo.numero:'')) : (chaveInfo?chaveInfo.numero:'');
+    const paginas = idxMap.paginas!==undefined ? r[idxMap.paginas] : '';
+    const compradorNome = idxMap.destinatario!==undefined ? String(r[idxMap.destinatario]||'').trim() : '';
+    const compradorCnpjDigits = idxMap.cnpjDestinatario!==undefined ? String(r[idxMap.cnpjDestinatario]||'').replace(/\D/g,'') : '';
+    const compradorCnpj = compradorCnpjDigits.length===14 ? compradorCnpjDigits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5') : '';
+
+    if(!cnpjRaw || cnpjRaw.length!==14){
+      registrarNota({id:'xlsx_'+i, arquivo:`Linha ${i+2} da planilha`, status:'erro', motivo:'CNPJ do emitente não encontrado/ inválido nesta linha', textoBruto:JSON.stringify(r)}, savedForn, 'planilha');
+    } else {
+      registrarNota({
+        id:'xlsx_'+i, arquivo: paginas ? `Nº ${numero} (pág. ${paginas} do PDF)` : `Nº ${numero}`,
+        status: valor!==null ? 'ok' : 'parcial',
+        chave: chaveInfo?chaveInfo.chave:chave, cnpjRaw, cnpj: cnpjRaw.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5'),
+        numero, data, dataISO: parseDataBR(data), valor, nomeSugerido: nome,
+        compradorNome, compradorCnpj, textoBruto:''
+      }, savedForn, 'planilha');
+    }
+
+    if(i % 200 === 0){
+      document.getElementById('progressLabel').textContent = `${i+1} / ${linhas.length}`;
+      document.getElementById('progressFill').style.width = Math.round(((i+1)/linhas.length)*100)+'%';
+      await new Promise(r=>setTimeout(r,0));
+    }
+  }
+
+  document.getElementById('progressRow').classList.remove('show');
+  renderAll();
+  enriquecerFornecedoresReceita();
+}
+
+// ---------- render ----------
+const CAT_LABEL = {refinaria:'Refinaria', posto:'Posto de combustível', distribuidora:'Distribuidora', outro:'Outro'};
+const CAT_COLOR = {refinaria:'#2C6E6C', posto:'#DB8A2C', distribuidora:'#3F5D82', outro:'#8A9490'};
+
+function fmtMoeda(v){
+  if(v===null || v===undefined) return '—';
+  return v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+}
+
+function categoriaDaNota(n){
+  if(n.status==='erro') return 'erro';
+  const destCnpj = String(n.compradorCnpj||'').replace(/\D/g,'');
+  if(destCnpj && postos[destCnpj]) return 'posto';
+  if(!n.cnpjRaw || !fornecedores[n.cnpjRaw]) return 'outro';
+  return fornecedores[n.cnpjRaw].categoria;
+}
+
+function renderAll(){
+  const total = notas.length;
+  document.getElementById('headerMeta').textContent = `${total} nota${total!==1?'s':''} carregada${total!==1?'s':''}`;
+  document.getElementById('cForn').textContent = `(${Object.keys(fornecedores).length})`;
+  document.getElementById('cNotas').textContent = `(${total})`;
+
+  const erros = notas.filter(n=>n.status==='erro');
+  const alertEl = document.getElementById('errorAlert');
+  if(erros.length>0){
+    alertEl.classList.add('show');
+    alertEl.textContent = `${erros.length} arquivo(s) não puderam ser lidos automaticamente (ex.: PDF escaneado sem texto). Eles aparecem na aba Notas com status "erro" — confira manualmente.`;
+  } else {
+    alertEl.classList.remove('show');
+  }
+
+  renderPainel();
+  renderFornecedores();
+  renderNotas();
+}
+
+function renderPainel(){
+  if(notas.length===0){
+    document.getElementById('painelEmpty').style.display='block';
+    document.getElementById('painelContent').style.display='none';
+    return;
+  }
+  document.getElementById('painelEmpty').style.display='none';
+  document.getElementById('painelContent').style.display='block';
+
+  const totals = {refinaria:0, posto:0, distribuidora:0, outro:0};
+  let totalGeral=0, qtdErro=0;
+  notas.forEach(n=>{
+    if(n.status==='erro'){ qtdErro++; return; }
+    const cat = categoriaDaNota(n);
+    totals[cat] = (totals[cat]||0) + (n.valor||0);
+    totalGeral += (n.valor||0);
+  });
+
+  const cards = [
+    {label:'Valor total geral', value:fmtMoeda(totalGeral), sub:`${notas.length} notas processadas`, cls:'ink'},
+    {label:'Postos de combustível', value:fmtMoeda(totals.posto), sub:`${countCat('posto')} notas · ${Object.keys(postos).length} postos reconhecidos`, cls:'amber'},
+    {label:'Refinarias', value:fmtMoeda(totals.refinaria), sub:`${countCat('refinaria')} notas`, cls:'teal'},
+    {label:'Distribuidoras', value:fmtMoeda(totals.distribuidora), sub:`${countCat('distribuidora')} notas`, cls:'steel'},
+  ];
+  document.getElementById('summaryCards').innerHTML = cards.map(c=>`
+    <div class="card ${c.cls}">
+      <div class="label">${c.label}</div>
+      <div class="value">${c.value}</div>
+      <div class="sub">${c.sub}${qtdErro && c.cls==='ink' ? ` · ${qtdErro} com erro` : ''}</div>
+    </div>`).join('');
+
+  const gaugeTotal = totals.refinaria+totals.posto+totals.distribuidora+totals.outro || 1;
+  const order = ['posto','refinaria','distribuidora','outro'];
+  document.getElementById('gaugeBar').innerHTML = order.map(k=>{
+    const pct = (totals[k]/gaugeTotal*100);
+    if(pct<=0) return '';
+    return `<div style="width:${pct}%;background:${CAT_COLOR[k]}" title="${CAT_LABEL[k]}: ${pct.toFixed(1)}%"></div>`;
+  }).join('');
+  document.getElementById('gaugeLegend').innerHTML = order.map(k=>
+    `<span><i style="background:${CAT_COLOR[k]}"></i>${CAT_LABEL[k]} — ${fmtMoeda(totals[k])} (${(totals[k]/gaugeTotal*100).toFixed(1)}%)</span>`
+  ).join('');
+
+  renderChartCategoria(totals);
+  renderChartTop10();
+}
+
+function countCat(cat){
+  return notas.filter(n=>n.status!=='erro' && categoriaDaNota(n)===cat).length;
+}
+
+function renderChartCategoria(totals){
+  const ctx = document.getElementById('chartCategoria');
+  if(charts.categoria) charts.categoria.destroy();
+  const labels = ['posto','refinaria','distribuidora','outro'].map(k=>CAT_LABEL[k]);
+  const data = ['posto','refinaria','distribuidora','outro'].map(k=>totals[k]);
+  const colors = ['posto','refinaria','distribuidora','outro'].map(k=>CAT_COLOR[k]);
+  charts.categoria = new Chart(ctx, {
+    type:'bar',
+    data:{labels, datasets:[{data, backgroundColor:colors, borderRadius:5, maxBarThickness:56}]},
+    options:{
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{ticks:{callback:v=>'R$ '+v.toLocaleString('pt-BR')}, grid:{color:'#E5E9E3'}},
+        x:{grid:{display:false}}
+      }
+    }
+  });
+}
+
+function renderChartTop10(){
+  const arr = Object.entries(fornecedores).sort((a,b)=>b[1].valorTotal-a[1].valorTotal).slice(0,10);
+  const ctx = document.getElementById('chartTop10');
+  if(charts.top10) charts.top10.destroy();
+  charts.top10 = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: arr.map(([cnpj,f])=> (f.nome||cnpj).slice(0,26)),
+      datasets:[{data: arr.map(([,f])=>f.valorTotal), backgroundColor: arr.map(([,f])=>CAT_COLOR[f.categoria]||'#8A9490'), borderRadius:5}]
+    },
+    options:{
+      indexAxis:'y',
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{callback:v=>'R$ '+v.toLocaleString('pt-BR')}, grid:{color:'#E5E9E3'}},
+        y:{grid:{display:false}, ticks:{font:{size:11}}}
+      }
+    }
+  });
+}
+
+const FONTE_LABEL = {
+  receita:'<span class="tag ok">Receita Federal</span>',
+  pdf:'<span class="tag outro">sugestão do PDF</span>',
+  planilha:'<span class="tag outro">planilha importada</span>',
+  salvo:'<span class="tag ok">editado por você</span>',
+  consultando:'<span class="tag outro">consultando Receita Federal…</span>'
+};
+
+function renderFornecedores(){
+  const entries = Object.entries(fornecedores);
+  if(entries.length===0){
+    document.getElementById('fornEmpty').style.display='block';
+    document.getElementById('tableForn').style.display='none';
+    return;
+  }
+  document.getElementById('fornEmpty').style.display='none';
+  document.getElementById('tableForn').style.display='table';
+
+  const search = document.getElementById('searchForn').value.toLowerCase();
+  const filtered = entries.filter(([cnpj,f])=>
+    !search || cnpj.includes(search) || (f.nome||'').toLowerCase().includes(search)
+  ).sort((a,b)=>b[1].valorTotal-a[1].valorTotal);
+
+  document.getElementById('tbodyForn').innerHTML = filtered.map(([cnpj,f])=>{
+    const cnpjFmt = cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5');
+    return `<tr data-cnpj="${cnpj}">
+      <td class="mono">${cnpjFmt}</td>
+      <td>
+        <input type="text" class="forn-nome" value="${(f.nome||'').replace(/"/g,'&quot;')}">
+        <div style="margin-top:3px;">${FONTE_LABEL[f.fonteNome]||''}</div>
+      </td>
+      <td style="font-size:11.5px;color:var(--ink-soft);max-width:220px;">${f.cnaeDescricao||'—'}</td>
+      <td>
+        <select class="cat forn-cat">
+          <option value="posto" ${f.categoria==='posto'?'selected':''}>Posto de combustível</option>
+          <option value="refinaria" ${f.categoria==='refinaria'?'selected':''}>Refinaria</option>
+          <option value="distribuidora" ${f.categoria==='distribuidora'?'selected':''}>Distribuidora</option>
+          <option value="outro" ${f.categoria==='outro'?'selected':''}>Outro</option>
+        </select>
+      </td>
+      <td class="mono">${f.notasCount}</td>
+      <td class="mono">${fmtMoeda(f.valorTotal)}</td>
+    </tr>`;
+  }).join('');
+
+  document.querySelectorAll('.forn-nome').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const cnpj = e.target.closest('tr').dataset.cnpj;
+      fornecedores[cnpj].nome = e.target.value;
+      fornecedores[cnpj].fonteNome = 'salvo';
+      persistForn();
+    });
+  });
+  document.querySelectorAll('.forn-cat').forEach(sel=>{
+    sel.addEventListener('change', e=>{
+      const cnpj = e.target.closest('tr').dataset.cnpj;
+      fornecedores[cnpj].categoria = e.target.value;
+      fornecedores[cnpj].categoriaManual = true;
+      persistForn();
+      renderAll();
+    });
+  });
+}
+
+function popularFiltrosNotas(){
+  const selFor = document.getElementById('filterFornecedor');
+  const selComp = document.getElementById('filterComprador');
+  const curFor = selFor.value, curComp = selComp.value;
+
+  const fornOptions = Object.entries(fornecedores)
+    .map(([cnpj,f])=>({value:cnpj, label:f.nome||cnpj}))
+    .sort((a,b)=>a.label.localeCompare(b.label,'pt-BR'));
+  selFor.innerHTML = '<option value="">Todos fornecedores</option>' +
+    fornOptions.map(o=>`<option value="${o.value}">${o.label}</option>`).join('');
+  selFor.value = fornOptions.some(o=>o.value===curFor) ? curFor : '';
+
+  const compradorMap = {};
+  notas.forEach(n=>{ if(n.compradorCnpj) compradorMap[n.compradorCnpj] = n.compradorNome || n.compradorCnpj; });
+  const compOptions = Object.entries(compradorMap)
+    .map(([cnpj,nome])=>({value:cnpj, label:nome}))
+    .sort((a,b)=>a.label.localeCompare(b.label,'pt-BR'));
+  selComp.innerHTML = '<option value="">Todos compradores</option>' +
+    compOptions.map(o=>`<option value="${o.value}">${o.label}</option>`).join('');
+  selComp.value = compOptions.some(o=>o.value===curComp) ? curComp : '';
+}
+
+function notasFiltradas(){
+  const search = document.getElementById('searchNotas').value.toLowerCase();
+  const filtroCat = document.getElementById('filterCategoria').value;
+  const filtroForn = document.getElementById('filterFornecedor').value;
+  const filtroComp = document.getElementById('filterComprador').value;
+  const filtroDe = document.getElementById('filterDataDe').value;
+  const filtroAte = document.getElementById('filterDataAte').value;
+
+  return notas.filter(n=>{
+    const cat = categoriaDaNota(n);
+    if(filtroCat && cat!==filtroCat) return false;
+    if(filtroForn && n.cnpjRaw!==filtroForn) return false;
+    if(filtroComp && n.compradorCnpj!==filtroComp) return false;
+    if(filtroDe && (!n.dataISO || n.dataISO < filtroDe)) return false;
+    if(filtroAte && (!n.dataISO || n.dataISO > filtroAte)) return false;
+    if(!search) return true;
+    const hay = `${n.arquivo} ${n.cnpj||''} ${n.numero||''} ${(fornecedores[n.cnpjRaw]||{}).nome||''} ${n.compradorNome||''}`.toLowerCase();
+    return hay.includes(search);
+  });
+}
+
+function renderNotas(){
+  if(notas.length===0){
+    document.getElementById('notasEmpty').style.display='block';
+    document.getElementById('tableNotas').style.display='none';
+    return;
+  }
+  document.getElementById('notasEmpty').style.display='none';
+  document.getElementById('tableNotas').style.display='table';
+
+  popularFiltrosNotas();
+  const filtered = notasFiltradas();
+
+  document.getElementById('tbodyNotas').innerHTML = filtered.map(n=>{
+    const cat = categoriaDaNota(n);
+    const forn = n.cnpjRaw ? fornecedores[n.cnpjRaw] : null;
+    const statusTag = n.status==='erro' ? `<span class="tag erro">erro</span>` : `<span class="tag ok">ok</span>`;
+    const raw = n.status==='erro' ? `<details class="raw"><summary>ver texto extraído / motivo</summary><pre>${(n.motivo?n.motivo+'\\n\\n':'')}${(n.textoBruto||'').replace(/</g,'&lt;')}</pre></details>` : '';
+    return `<tr>
+      <td>${n.arquivo}${raw}</td>
+      <td class="mono">${n.numero||'—'}</td>
+      <td class="mono">${n.cnpj||'—'}</td>
+      <td>${forn?forn.nome:'—'}</td>
+      <td>${n.compradorNome||'—'}</td>
+      <td>${cat!=='erro'?`<span class="tag ${cat}">${CAT_LABEL[cat]||cat}</span>`:'—'}</td>
+      <td class="mono">${n.data||'—'}</td>
+      <td class="mono">${fmtMoeda(n.valor)}</td>
+      <td>${statusTag}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ---------- export CSV ----------
+function exportarCSV(){
+  const header = ['Arquivo','Numero_NF','CNPJ_Fornecedor','Fornecedor','CNPJ_Comprador','Comprador','Categoria','Data','Valor','Status'];
+  const dados = notas.length && document.getElementById('tableNotas').style.display==='table' ? notasFiltradas() : notas;
+  const rows = dados.map(n=>{
+    const cat = categoriaDaNota(n);
+    const forn = n.cnpjRaw ? fornecedores[n.cnpjRaw] : null;
+    return [
+      n.arquivo, n.numero||'', n.cnpj||'', forn?forn.nome:'', n.compradorCnpj||'', n.compradorNome||'',
+      CAT_LABEL[cat]||cat, n.data||'',
+      n.valor!==null && n.valor!==undefined ? n.valor.toFixed(2).replace('.',',') : '', n.status
+    ];
+  });
+  const csvLines = [header, ...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(';'));
+  const csv = '\uFEFF' + csvLines.join('\r\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'notas_fiscais_combustiveis.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ---------- eventos ----------
+document.getElementById('btnSelect').addEventListener('click', ()=>document.getElementById('fileInput').click());
+document.getElementById('fileInput').addEventListener('change', e=>processarArquivos(e.target.files));
+
+const dz = document.getElementById('dropzone');
+dz.addEventListener('dragover', e=>{e.preventDefault(); dz.classList.add('drag');});
+dz.addEventListener('dragleave', ()=>dz.classList.remove('drag'));
+dz.addEventListener('drop', e=>{
+  e.preventDefault(); dz.classList.remove('drag');
+  processarArquivos(e.dataTransfer.files);
+});
+dz.addEventListener('click', (e)=>{ if(e.target.tagName!=='BUTTON') document.getElementById('fileInput').click(); });
+
+document.getElementById('btnSelectXlsx').addEventListener('click', ()=>document.getElementById('xlsxInput').click());
+document.getElementById('xlsxInput').addEventListener('change', e=>{ if(e.target.files[0]) processarXLSX(e.target.files[0]); });
+const dzXlsx = document.getElementById('dropzoneXlsx');
+dzXlsx.addEventListener('dragover', e=>{e.preventDefault(); dzXlsx.classList.add('drag');});
+dzXlsx.addEventListener('dragleave', ()=>dzXlsx.classList.remove('drag'));
+dzXlsx.addEventListener('drop', e=>{
+  e.preventDefault(); dzXlsx.classList.remove('drag');
+  if(e.dataTransfer.files[0]) processarXLSX(e.dataTransfer.files[0]);
+});
+dzXlsx.addEventListener('click', (e)=>{ if(e.target.tagName!=='BUTTON') document.getElementById('xlsxInput').click(); });
+
+document.querySelectorAll('nav.tabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+document.getElementById('searchForn').addEventListener('input', renderFornecedores);
+document.getElementById('searchNotas').addEventListener('input', renderNotas);
+document.getElementById('filterCategoria').addEventListener('change', renderNotas);
+document.getElementById('filterFornecedor').addEventListener('change', renderNotas);
+document.getElementById('filterComprador').addEventListener('change', renderNotas);
+document.getElementById('filterDataDe').addEventListener('change', renderNotas);
+document.getElementById('filterDataAte').addEventListener('change', renderNotas);
+document.getElementById('btnLimparFiltros').addEventListener('click', ()=>{
+  document.getElementById('searchNotas').value='';
+  document.getElementById('filterCategoria').value='';
+  document.getElementById('filterFornecedor').value='';
+  document.getElementById('filterComprador').value='';
+  document.getElementById('filterDataDe').value='';
+  document.getElementById('filterDataAte').value='';
+  renderNotas();
+});
+document.getElementById('btnExportCsv').addEventListener('click', exportarCSV);
+document.getElementById('btnConsultarReceita').addEventListener('click', ()=>{
+  enriquecerFornecedoresReceita();
+});
+document.getElementById('btnResetForn').addEventListener('click', async ()=>{
+  try{ await window.storage.delete('fornecedores-classificacao', false); }catch(e){}
+  location.reload();
+});
+
+(async ()=>{ cnpjCache = await loadCnpjCacheStorage(); })();
+</script>
+</body>
+</html>
